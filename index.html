@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Доходности НПФ - динамический расчет</title>
+    <title>Доходности НПФ/УК - динамический расчет</title>
     <meta charset="UTF-8">
     <style>
         body {
@@ -22,6 +22,25 @@
             padding: 15px;
             background: #e9ecef;
             border-radius: 8px;
+        }
+        .data-source {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #fff3cd;
+            border-radius: 8px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        .data-source label {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        .data-source input {
+            margin: 0;
+            cursor: pointer;
         }
         select, input, button {
             padding: 8px 12px;
@@ -89,7 +108,6 @@
             background-color: #96d2f2 !important;
             border-left: 4px solid #2196f3 !important;
         }
-
         .special-fund-rucbtrns {
             background-color: #e7dfe8 !important;
             border-left: 4px solid #c8c8c8 !important;
@@ -116,44 +134,51 @@
             border-radius: 4px;
         }
         
-        /* Стиль для кнопки сортировки */
-        .sort-buttons {
-            margin-left: 20px;
+        .rolling-link {
             display: inline-block;
+            margin-top: 20px;
+            padding: 8px 16px;
+            background: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
         }
-        .sort-btn {
-            background: #6c757d;
-            font-size: 12px;
-            padding: 4px 8px;
-        }
-        .sort-btn:hover {
-            background: #5a6268;
+        .rolling-link:hover {
+            background: #1e7e34;
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>📊 Доходность НПФ</h1>
+    <h1>📊 Доходность НПФ / УК</h1>
     
-<div style="margin-bottom: 20px;">
-    <a href="rolling-periods.html" style="display: inline-block; padding: 8px 16px; background: #28a745; color: white; text-decoration: none; border-radius: 5px;">
-        📈 Анализ скользящих периодов (НПФ vs Инфляция)
-    </a>
-</div>
-
+    <div class="data-source">
+        <strong>Выберите тип:</strong>
+        <label>
+            <input type="radio" name="dataSource" value="npf" checked> НПФ
+        </label>
+        <label>
+            <input type="radio" name="dataSource" value="uk"> УК (Управляющие компании)
+        </label>
+    </div>
+    
     <!-- Легенда для специальных фондов -->
     <div class="legend">
         <div class="legend-item">
-            <div class="legend-color" style="background: #fff3e0; border-left: 4px solid #ff9800;"></div>
+            <div class="legend-color" style="background: #cadecc; border-left: 4px solid #ff9800;"></div>
             <span>MCFTR</span>
         </div>
         <div class="legend-item">
-            <div class="legend-color" style="background: #e8f5e9; border-left: 4px solid #4caf50;"></div>
+            <div class="legend-color" style="background: #d1d1cf; border-left: 4px solid #4caf50;"></div>
             <span>Инфляция</span>
         </div>
         <div class="legend-item">
-            <div class="legend-color" style="background: #e3f2fd; border-left: 4px solid #2196f3;"></div>
+            <div class="legend-color" style="background: #96d2f2; border-left: 4px solid #2196f3;"></div>
             <span>RGBITR</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #e7dfe8; border-left: 4px solid #c8c8c8;"></div>
+            <span>RUCBTRNS</span>
         </div>
     </div>
     
@@ -173,16 +198,20 @@
     
     <div id="result"></div>
     <div id="stats" class="stats"></div>
+    
+    <a href="rolling-periods.html" class="rolling-link">📈 Анализ скользящих периодов (НПФ/УК vs Инфляция)</a>
 </div>
 
 <script>
-    // ВАША ССЫЛКА НА ОПУБЛИКОВАННЫЙ CSV
-    const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0xP6hNrFhTWCxec9251XFfrOolDs_HPFm2dMj1MSyLpPreXQQj3gBOWNsW8-6yL5ID0WxoSYGm6wJ/pub?gid=0&single=true&output=csv';
+    // Ссылки на данные
+    const DATA_URLS = {
+        npf: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0xP6hNrFhTWCxec9251XFfrOolDs_HPFm2dMj1MSyLpPreXQQj3gBOWNsW8-6yL5ID0WxoSYGm6wJ/pub?output=csv&gid=0',
+        uk:  'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0xP6hNrFhTWCxec9251XFfrOolDs_HPFm2dMj1MSyLpPreXQQj3gBOWNsW8-6yL5ID0WxoSYGm6wJ/pub?output=csv&gid=724842481',
+    };
     
-    let allData = []; // Храним все данные [{fund, year, return}]
-    let currentSortOrder = 'desc'; // 'desc' или 'asc'
+    let allData = [];
+    let currentDataSource = 'npf';
     
-    // Функция для определения класса специального фонда
     function getSpecialFundClass(fundName) {
         if (fundName === "MCFTR") return "special-fund-mcftr";
         if (fundName === "Инфляция") return "special-fund-inflation";
@@ -197,20 +226,15 @@
         const selectedFund = document.getElementById('fundFilter').value;
         
         try {
-            // Загружаем данные если еще не загружены
-            if (allData.length === 0) {
-                await loadData();
-            }
+            await loadData();
             
-            // Фильтруем по годам
             let filteredData = allData.filter(d => d.year >= startYear && d.year <= endYear);
             
-            // Фильтруем по фонду
             if (selectedFund) {
                 filteredData = filteredData.filter(d => d.fund === selectedFund);
             }
             
-            displayResults(filteredData, startYear, endYear, selectedFund);
+            displayResults(filteredData, startYear, endYear);
             displayStats(filteredData, startYear, endYear);
             
         } catch(error) {
@@ -221,14 +245,20 @@
     }
     
     async function loadData() {
+        const radioSelected = document.querySelector('input[name="dataSource"]:checked').value;
+        if (radioSelected === currentDataSource && allData.length > 0) {
+            return;
+        }
+        
+        currentDataSource = radioSelected;
+        const SHEET_URL = DATA_URLS[currentDataSource];
+        
         const response = await fetch(SHEET_URL);
         const csvText = await response.text();
         
-        // Парсим CSV с учетом заголовков FundName, Year, Return
         const lines = csvText.split('\n');
         const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
         
-        // Находим индексы колонок (регистронезависимо)
         const fundIndex = headers.findIndex(h => h.includes('fund') || h.includes('название'));
         const yearIndex = headers.findIndex(h => h.includes('year') || h.includes('год'));
         const returnIndex = headers.findIndex(h => h.includes('return') || h.includes('доходн') || h === 'return');
@@ -242,7 +272,6 @@
         for(let i = 1; i < lines.length; i++) {
             if(!lines[i].trim()) continue;
             
-            // Обрабатываем кавычки в CSV
             let values = [];
             let inQuotes = false;
             let current = '';
@@ -272,7 +301,6 @@
             }
         }
         
-        // Заполняем выпадающий список фондов
         const funds = [...new Set(allData.map(d => d.fund))].sort();
         const select = document.getElementById('fundFilter');
         select.innerHTML = '<option value="">Все фонды</option>';
@@ -283,16 +311,19 @@
             select.appendChild(option);
         });
         
-        console.log(`Загружено ${allData.length} записей по ${funds.length} фондам`);
+        // Обновляем заголовок
+        const title = currentDataSource === 'npf' ? 'НПФ' : 'УК';
+        document.querySelector('h1').innerHTML = `📊 Доходность ${title}`;
+        
+        console.log(`Загружено ${allData.length} записей по ${funds.length} фондам (${currentDataSource})`);
     }
     
-    function displayResults(data, startYear, endYear, selectedFund) {
+    function displayResults(data, startYear, endYear) {
         if (data.length === 0) {
             document.getElementById('result').innerHTML = '<p>Нет данных за выбранный период</p>';
             return;
         }
         
-        // Группируем по фондам
         const fundsMap = new Map();
         data.forEach(item => {
             if (!fundsMap.has(item.fund)) {
@@ -301,7 +332,6 @@
             fundsMap.get(item.fund).set(item.year, item.return);
         });
         
-        // Создаем массив объектов фондов с их метриками для сортировки
         const fundsArray = [];
         const sortedFunds = Array.from(fundsMap.keys());
         
@@ -322,7 +352,6 @@
                 }
             }
             
-            // Пропускаем фонды с пропущенными данными
             if (hasMissingData) {
                 return;
             }
@@ -339,13 +368,10 @@
             });
         });
         
-        // Сортируем по убыванию средней доходности
         fundsArray.sort((a, b) => b.geometricAvg - a.geometricAvg);
         
-        // Формируем таблицу
         let html = '<table>\n<thead>\n<tr>\n<th>НПФ</th>\n';
         
-        // Заголовки годов
         for(let year = startYear; year <= endYear; year++) {
             html += `<th>${year}</th>`;
         }
@@ -353,7 +379,6 @@
         html += '<th>Совокупная</th>\n';
         html += '</tr>\n</thead>\n<tbody>\n';
         
-        // Выводим отсортированные фонды
         fundsArray.forEach(fund => {
             const specialClass = getSpecialFundClass(fund.name);
             const rowClass = specialClass ? `class="${specialClass}"` : '';
@@ -361,7 +386,6 @@
             let fund_html = `<tr ${rowClass}>\n`;
             fund_html += `<td><b>${fund.name}</b></td>\n`;
             
-            // Выводим доходность по годам
             for(let year = startYear; year <= endYear; year++) {
                 const ret = fund.returnsByYear.get(year);
                 if (ret !== undefined) {
@@ -370,17 +394,13 @@
                 }
             }
             
-            // Среднегеометрическая доходность
             const avgClass = fund.geometricAvg >= 0 ? 'positive' : 'negative';
             fund_html += `<td class="${avgClass}"><b>${fund.geometricAvg.toFixed(2)}%</b></td>\n`;
             
-            // Совокупная доходность
             const totalClass = fund.totalReturn >= 0 ? 'positive' : 'negative';
             fund_html += `<td class="${totalClass}"><b>${fund.totalReturn.toFixed(2)}%</b></td>\n`;
             
-            // Количество лет
             fund_html += '</tr>\n';
-            
             html += fund_html;
         });
         
@@ -389,93 +409,91 @@
     }
     
     function displayStats(data, startYear, endYear) {
-    if (data.length === 0) return;
-    
-    // Группируем по фондам и проверяем полноту данных
-    const fundsMapComplete = new Map();
-    data.forEach(item => {
-        if (!fundsMapComplete.has(item.fund)) {
-            fundsMapComplete.set(item.fund, new Map());
-        }
-        fundsMapComplete.get(item.fund).set(item.year, item.return);
-    });
-    
-    // Отбираем только фонды с полными данными за весь период
-    // Исключаем специальные бенчмарки
-    const yearsRange = endYear - startYear + 1;
-    const completeFundsData = [];
-    
-    for (const [fund, returnsByYear] of fundsMapComplete) {
-        // Пропускаем специальные бенчмарки
-        const specialClass = getSpecialFundClass(fund);
-        if (specialClass) {
-            console.log(`Исключаем бенчмарк из статистики: ${fund}`);
-            continue;
-        }
+        if (data.length === 0) return;
         
-        let hasAllYears = true;
-        const returns = [];
-        
-        for (let year = startYear; year <= endYear; year++) {
-            const ret = returnsByYear.get(year);
-            if (ret === undefined) {
-                hasAllYears = false;
-                break;
+        const fundsMapComplete = new Map();
+        data.forEach(item => {
+            if (!fundsMapComplete.has(item.fund)) {
+                fundsMapComplete.set(item.fund, new Map());
             }
-            returns.push(ret);
+            fundsMapComplete.get(item.fund).set(item.year, item.return);
+        });
+        
+        const yearsRange = endYear - startYear + 1;
+        const completeFundsData = [];
+        
+        for (const [fund, returnsByYear] of fundsMapComplete) {
+            const specialClass = getSpecialFundClass(fund);
+            if (specialClass) continue;
+            
+            let hasAllYears = true;
+            const returns = [];
+            
+            for (let year = startYear; year <= endYear; year++) {
+                const ret = returnsByYear.get(year);
+                if (ret === undefined) {
+                    hasAllYears = false;
+                    break;
+                }
+                returns.push(ret);
+            }
+            
+            if (hasAllYears && returns.length === yearsRange) {
+                completeFundsData.push({
+                    fund: fund,
+                    returns: returns
+                });
+            }
         }
         
-        if (hasAllYears && returns.length === yearsRange) {
-            completeFundsData.push({
-                fund: fund,
-                returns: returns
-            });
+        if (completeFundsData.length === 0) {
+            document.getElementById('stats').innerHTML = '<p>Нет фондов с полными данными за выбранный период</p>';
+            return;
         }
+        
+        const allReturns = [];
+        completeFundsData.forEach(f => {
+            allReturns.push(...f.returns);
+        });
+        
+        const avgArithmeticReturn = (allReturns.reduce((a,b) => a+b, 0) / allReturns.length).toFixed(2);
+        const maxReturn = Math.max(...allReturns).toFixed(2);
+        const minReturn = Math.min(...allReturns).toFixed(2);
+        
+        const fundAverages = completeFundsData.map(fund => {
+            const product = fund.returns.reduce((acc, ret) => acc * (1 + ret/100), 1.0);
+            const geometricAvg = 100 * (Math.pow(product, 1 / fund.returns.length) - 1);
+            return {
+                fund: fund.fund,
+                avg: geometricAvg
+            };
+        })
+        .sort((a,b) => b.avg - a.avg)
+        .slice(0, 3);
+        
+        let html = `
+            <h3>📈 Общая статистика (только фонды с полными данными за ${startYear}-${endYear})</h3>
+            <p>📊 Фондов с полными данными: ${completeFundsData.length}</p>
+            <p>📈 Средняя арифметическая доходность: <b class="${avgArithmeticReturn >= 0 ? 'positive' : 'negative'}">${avgArithmeticReturn}%</b></p>
+            <p>📈 Максимальная годовая доходность: <b class="positive">${maxReturn}%</b></p>
+            <p>📉 Минимальная годовая доходность: <b class="negative">${minReturn}%</b></p>
+            <h4>🏆 Топ-3 фонда по среднегеометрической доходности (CAGR):</h4>
+            <ol>
+                ${fundAverages.map(f => `<li>${f.fund}: <b class="${f.avg >= 0 ? 'positive' : 'negative'}">${f.avg.toFixed(2)}%</b></li>`).join('')}
+            </ol>
+        `;
+        
+        document.getElementById('stats').innerHTML = html;
     }
     
-    if (completeFundsData.length === 0) {
-        document.getElementById('stats').innerHTML = '<p>Нет фондов с полными данными за выбранный период</p>';
-        return;
-    }
-    
-    // Собираем все доходности для общей статистики
-    const allReturns = [];
-    completeFundsData.forEach(f => {
-        allReturns.push(...f.returns);
+    // Подписка на изменение переключателя
+    document.querySelectorAll('input[name="dataSource"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            allData = [];
+            loadAndDisplay();
+        });
     });
     
-    const avgArithmeticReturn = (allReturns.reduce((a,b) => a+b, 0) / allReturns.length).toFixed(2);
-    const maxReturn = Math.max(...allReturns).toFixed(2);
-    const minReturn = Math.min(...allReturns).toFixed(2);
-    
-    // Топ-3 фонда по СРЕДНЕГЕОМЕТРИЧЕСКОЙ доходности (только фонды, без бенчмарков)
-    const fundAverages = completeFundsData.map(fund => {
-        const product = fund.returns.reduce((acc, ret) => acc * (1 + ret/100), 1.0);
-        const geometricAvg = 100 * (Math.pow(product, 1 / fund.returns.length) - 1);
-        return {
-            fund: fund.fund,
-            avg: geometricAvg
-        };
-    })
-    .sort((a,b) => b.avg - a.avg)
-    .slice(0, 3);
-    
-    let html = `
-        <h3>📈 Общая статистика (только фонды с полными данными за ${startYear}-${endYear})</h3>
-        <p>📊 Фондов с полными данными: ${completeFundsData.length}</p>
-        <p>📈 Средняя арифметическая доходность: <b class="${avgArithmeticReturn >= 0 ? 'positive' : 'negative'}">${avgArithmeticReturn}%</b></p>
-        <p>📈 Максимальная годовая доходность: <b class="positive">${maxReturn}%</b></p>
-        <p>📉 Минимальная годовая доходность: <b class="negative">${minReturn}%</b></p>
-        <h4>🏆 Топ-3 фонда по среднегеометрической доходности (CAGR):</h4>
-        <ol>
-            ${fundAverages.map(f => `<li>${f.fund}: <b class="${f.avg >= 0 ? 'positive' : 'negative'}">${f.avg.toFixed(2)}%</b></li>`).join('')}
-        </ol>
-    `;
-    
-    document.getElementById('stats').innerHTML = html;
-}
-    
-    // Автоматическая загрузка при открытии страницы
     loadAndDisplay();
 </script>
 </body>

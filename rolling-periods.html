@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Анализ скользящих периодов - НПФ vs Инфляция</title>
+    <title>Анализ скользящих периодов - НПФ/УК vs Инфляция</title>
     <meta charset="UTF-8">
     <style>
         body {
@@ -28,6 +28,25 @@
         }
         .back-link:hover {
             background: #0056b3;
+        }
+        .data-source {
+            margin: 15px 0;
+            padding: 10px;
+            background: #fff3cd;
+            border-radius: 8px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        .data-source label {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        .data-source input {
+            margin: 0;
+            cursor: pointer;
         }
         h1 {
             color: #333;
@@ -148,24 +167,23 @@
             margin-top: 10px;
             font-style: italic;
         }
-        .fund-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .fund-item {
-            padding: 8px;
-            border-bottom: 1px solid #dee2e6;
-        }
-        .fund-item:hover {
-            background: #f8f9fa;
-        }
     </style>
 </head>
 <body>
 <div class="container">
     <a href="index.html" class="back-link">← Назад к основной таблице</a>
     
-    <h1>📊 Анализ скользящих периодов: НПФ vs Инфляция</h1>
+    <h1>📊 Анализ скользящих периодов: vs Инфляция</h1>
+    
+    <div class="data-source">
+        <strong>Выберите тип:</strong>
+        <label>
+            <input type="radio" name="dataSource" value="npf" checked> НПФ
+        </label>
+        <label>
+            <input type="radio" name="dataSource" value="uk"> УК (Управляющие компании)
+        </label>
+    </div>
     
     <div class="legend">
         <div class="legend-item">
@@ -198,9 +216,12 @@
 </div>
 
 <script>
-    const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0xP6hNrFhTWCxec9251XFfrOolDs_HPFm2dMj1MSyLpPreXQQj3gBOWNsW8-6yL5ID0WxoSYGm6wJ/pub?gid=0&single=true&output=csv';
+    const DATA_URLS = {
+        npf: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0xP6hNrFhTWCxec9251XFfrOolDs_HPFm2dMj1MSyLpPreXQQj3gBOWNsW8-6yL5ID0WxoSYGm6wJ/pub?gid=0&single=true&output=csv',
+        uk: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vXXXXXX/pub?gid=0&single=true&output=csv'  // ЗАМЕНИТЕ НА ВАШУ ССЫЛКУ ДЛЯ УК
+    };
     
-    let allData = [];
+    let currentDataSource = 'npf';
     let currentWindow = 5;
     let inflationData = new Map();
     let fundData = new Map();
@@ -211,6 +232,7 @@
     }
     
     async function loadData() {
+        const SHEET_URL = DATA_URLS[currentDataSource];
         const response = await fetch(SHEET_URL);
         const csvText = await response.text();
         
@@ -258,6 +280,9 @@
             }
         }
         
+        inflationData.clear();
+        fundData.clear();
+        
         for (const [fund, returns] of fundsTemp) {
             if (fund === "Инфляция") {
                 inflationData = returns;
@@ -266,7 +291,10 @@
             }
         }
         
-        console.log(`Загружено ${fundData.size} фондов, данные по инфляции за ${inflationData.size} лет`);
+        const typeName = currentDataSource === 'npf' ? 'НПФ' : 'УК';
+        document.querySelector('h1').innerHTML = `📊 Анализ скользящих периодов: ${typeName} vs Инфляция`;
+        
+        console.log(`Загружено ${fundData.size} фондов (${currentDataSource}), данные по инфляции за ${inflationData.size} лет`);
     }
     
     function getRollingPeriods(windowYears) {
@@ -312,7 +340,6 @@
         const periods = getRollingPeriods(windowYears);
         const periodResults = [];
         
-        // Для каждого периода считаем среднюю доходность по всем фондам
         for (const period of periods) {
             let sumFundReturns = 0;
             let fundCount = 0;
@@ -343,7 +370,6 @@
             }
         }
         
-        // Также собираем данные по каждому фонду для топ-листов
         const fundStats = new Map();
         
         for (const period of periodResults) {
@@ -373,7 +399,13 @@
             });
         }
         
-        fundSummary.sort((a, b) => b.successRate - a.successRate);
+        // Сортировка: сначала по успешности (по убыванию), при равной - по средней доходности (по убыванию)
+        fundSummary.sort((a, b) => {
+            if (Math.abs(b.successRate - a.successRate) > 0.01) {
+                return b.successRate - a.successRate;
+            }
+            return b.avgReturn - a.avgReturn;
+        });
         
         return { periodResults, fundSummary, periodsCount: periods.length };
     }
@@ -387,7 +419,6 @@
             return;
         }
         
-        // Общая статистика по периодам
         const totalSuccessPeriods = periodResults.filter(p => p.success).length;
         const overallSuccessRate = (totalSuccessPeriods / periodResults.length) * 100;
         
@@ -400,11 +431,10 @@
         const overallAvgFundReturn = totalAvgFundReturn / periodResults.length;
         const overallAvgInflation = totalInflationReturn / periodResults.length;
         
-        // Топ-3 и худшие 10 фондов
+        // Топ-3 и худшие 3 фонда
         const top3Funds = fundSummary.slice(0, 3);
         const bottom3Funds = fundSummary.slice(-3).reverse();
         
-        // Таблица по периодам
         let tableHtml = `
             <h3>📋 Анализ ${windowYears}-летних периодов</h3>
             <p><strong>Всего периодов: ${periodResults.length}</strong></p>
@@ -439,7 +469,6 @@
             </table>
         `;
         
-        // Статистика
         const statsHtml = `
             <h3>📊 Общая статистика за ${windowYears}-летние периоды</h3>
             <div class="stats-grid">
@@ -459,7 +488,7 @@
                     </p>
                 </div>
                 <div class="stat-card">
-                    <h3>🏆 Топ-10 фондов по успешности</h3>
+                    <h3>🏆 Топ-3 фонда по успешности</h3>
                     <ol style="margin: 0; padding-left: 20px;">
                         ${top3Funds.map(f => `<li><b>${f.fund}</b><br>
                             Успешность: <span class="positive">${f.successRate.toFixed(1)}%</span> (${f.successCount}/${f.totalPeriods})<br>
@@ -468,7 +497,7 @@
                     </ol>
                 </div>
                 <div class="stat-card">
-                    <h3>⚠️ Худшие 10 фондов по успешности</h3>
+                    <h3>⚠️ Худшие 3 фонда по успешности</h3>
                     <ol style="margin: 0; padding-left: 20px;">
                         ${bottom3Funds.map(f => `<li><b>${f.fund}</b><br>
                             Успешность: <span class="${f.successRate >= 50 ? 'positive' : 'negative'}">${f.successRate.toFixed(1)}%</span> (${f.successCount}/${f.totalPeriods})<br>
@@ -483,24 +512,34 @@
         document.getElementById('stats').innerHTML = statsHtml;
     }
     
-    async function init() {
+    async function refresh() {
         try {
             await loadData();
             displayResults(currentWindow);
-            
-            document.querySelectorAll('.period-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    currentWindow = parseInt(btn.dataset.window);
-                    displayResults(currentWindow);
-                });
-            });
-            
         } catch(error) {
             document.getElementById('result').innerHTML = 
                 `<div style="color:red; padding:20px;">❌ Ошибка загрузки: ${error.message}</div>`;
         }
+    }
+    
+    async function init() {
+        document.querySelectorAll('input[name="dataSource"]').forEach(radio => {
+            radio.addEventListener('change', async () => {
+                currentDataSource = document.querySelector('input[name="dataSource"]:checked').value;
+                await refresh();
+            });
+        });
+        
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentWindow = parseInt(btn.dataset.window);
+                displayResults(currentWindow);
+            });
+        });
+        
+        await refresh();
     }
     
     init();
