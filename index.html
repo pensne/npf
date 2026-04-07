@@ -232,7 +232,7 @@
             fund_html += '<tr>\n';
             fund_html += `<td><b>${fund}</b></td>\n`;
             
-            let sum = 0;
+            let mul = 1.0;
             let count = 0;
             
             for(let year = startYear; year <= endYear; year++) {
@@ -240,14 +240,14 @@
                 if (ret !== undefined) {
                     const colorClass = ret >= 0 ? 'positive' : 'negative';
                     fund_html += `<td class="${colorClass}">${ret.toFixed(2)}%</td>\n`;
-                    sum += ret;
+                    mul *= (1 + ret);
                     count++;
                 } else {
                     return
                 }
             }
             
-            const avg = count > 0 ? (sum / count).toFixed(2) : '—';
+            const avg = count > 0 ? Math.pow(mul, 1 / count).toFixed(2) : '—';
             const avgClass = (avg !== '—' && parseFloat(avg) >= 0) ? 'positive' : 'negative';
             fund_html += `<td class="${avgClass}"><b>${avg}%</b></td>\n`;
             fund_html += `<td>${count}/${(endYear-startYear+1)}</td>\n`;
