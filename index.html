@@ -109,6 +109,20 @@
             height: 20px;
             border-radius: 4px;
         }
+        
+        /* Стиль для кнопки сортировки */
+        .sort-buttons {
+            margin-left: 20px;
+            display: inline-block;
+        }
+        .sort-btn {
+            background: #6c757d;
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+        .sort-btn:hover {
+            background: #5a6268;
+        }
     </style>
 </head>
 <body>
@@ -154,6 +168,7 @@
     const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0xP6hNrFhTWCxec9251XFfrOolDs_HPFm2dMj1MSyLpPreXQQj3gBOWNsW8-6yL5ID0WxoSYGm6wJ/pub?gid=0&single=true&output=csv';
     
     let allData = []; // Храним все данные [{fund, year, return}]
+    let currentSortOrder = 'desc'; // 'desc' или 'asc'
     
     // Функция для определения класса специального фонда
     function getSpecialFundClass(fundName) {
@@ -273,26 +288,12 @@
             fundsMap.get(item.fund).set(item.year, item.return);
         });
         
-        // Формируем таблицу
-        let html = '<table>\n<thead>\n<tr>\n<th>НПФ</th>\n';
-        
-        // Заголовки годов
-        for(let year = startYear; year <= endYear; year++) {
-            html += `<th>${year}</th>`;
-        }
-        html += '<th>Средняя<br>доходность</th>\n<th>Доступно<br>лет</th>\n</tr>\n</thead>\n<tbody>\n';
-        
-        // Сортируем фонды по алфавиту
-        const sortedFunds = Array.from(fundsMap.keys()).sort();
+        // Создаем массив объектов фондов с их метриками для сортировки
+        const fundsArray = [];
+        const sortedFunds = Array.from(fundsMap.keys());
         
         sortedFunds.forEach(fund => {
             const returnsByYear = fundsMap.get(fund);
-            const specialClass = getSpecialFundClass(fund);
-            const rowClass = specialClass ? `class="${specialClass}"` : '';
-            
-            let fund_html = `<tr ${rowClass}>\n`;
-            fund_html += `<td><b>${fund}</b></td>\n`;
-            
             let mul = 1.0;
             let count = 0;
             let hasMissingData = false;
@@ -300,25 +301,73 @@
             for(let year = startYear; year <= endYear; year++) {
                 const ret = returnsByYear.get(year);
                 if (ret !== undefined) {
-                    const colorClass = ret >= 0 ? 'positive' : 'negative';
-                    fund_html += `<td class="${colorClass}">${ret.toFixed(2)}%</td>\n`;
                     mul *= (1 + ret/100);
                     count++;
                 } else {
                     hasMissingData = true;
-                    break; // Прерываем цикл, так как в вашей логике используется return
+                    break;
                 }
             }
             
-            // Пропускаем фонд, если есть пропущенные данные (как в вашей исходной логике)
+            // Пропускаем фонды с пропущенными данными
             if (hasMissingData) {
                 return;
             }
             
-            const avg = count > 0 ? (100*(Math.pow(mul, 1 / count)-1)).toFixed(2) : '—';
-            const avgClass = (avg !== '—' && parseFloat(avg) >= 0) ? 'positive' : 'negative';
-            fund_html += `<td class="${avgClass}"><b>${avg}%</b></td>\n`;
-            fund_html += `<td>${count}/${(endYear-startYear+1)}</td>\n`;
+            const geometricAvg = count > 0 ? (100*(Math.pow(mul, 1 / count)-1)) : null;
+            const totalReturn = count > 0 ? 100*(mul - 1) : null;
+            
+            fundsArray.push({
+                name: fund,
+                returnsByYear: returnsByYear,
+                geometricAvg: geometricAvg,
+                totalReturn: totalReturn,
+                count: count
+            });
+        });
+        
+        // Сортируем по убыванию средней доходности
+        fundsArray.sort((a, b) => b.geometricAvg - a.geometricAvg);
+        
+        // Формируем таблицу
+        let html = '<table>\n<thead>\n<tr>\n<th>НПФ</th>\n';
+        
+        // Заголовки годов
+        for(let year = startYear; year <= endYear; year++) {
+            html += `<th>${year}</th>`;
+        }
+        html += '<th>Среднегеометрическая<br>доходность</th>\n';
+        html += '<th>Совокупная<br>доходность</th>\n';
+        html += '<th>Доступно<br>лет</th>\n';
+        html += '</tr>\n</thead>\n<tbody>\n';
+        
+        // Выводим отсортированные фонды
+        fundsArray.forEach(fund => {
+            const specialClass = getSpecialFundClass(fund.name);
+            const rowClass = specialClass ? `class="${specialClass}"` : '';
+            
+            let fund_html = `<tr ${rowClass}>\n`;
+            fund_html += `<td><b>${fund.name}</b></td>\n`;
+            
+            // Выводим доходность по годам
+            for(let year = startYear; year <= endYear; year++) {
+                const ret = fund.returnsByYear.get(year);
+                if (ret !== undefined) {
+                    const colorClass = ret >= 0 ? 'positive' : 'negative';
+                    fund_html += `<td class="${colorClass}">${ret.toFixed(2)}%</td>\n`;
+                }
+            }
+            
+            // Среднегеометрическая доходность
+            const avgClass = fund.geometricAvg >= 0 ? 'positive' : 'negative';
+            fund_html += `<td class="${avgClass}"><b>${fund.geometricAvg.toFixed(2)}%</b></td>\n`;
+            
+            // Совокупная доходность
+            const totalClass = fund.totalReturn >= 0 ? 'positive' : 'negative';
+            fund_html += `<td class="${totalClass}"><b>${fund.totalReturn.toFixed(2)}%</b></td>\n`;
+            
+            // Количество лет
+            fund_html += `<td>${fund.count}/${(endYear-startYear+1)}</td>\n`;
             fund_html += '</tr>\n';
             
             html += fund_html;
@@ -336,7 +385,7 @@
         const maxReturn = Math.max(...allReturns).toFixed(2);
         const minReturn = Math.min(...allReturns).toFixed(2);
         
-        // Топ-3 фонда по средней доходности
+        // Топ-3 фонда по средней доходности (среднеарифметической)
         const fundsMap = new Map();
         data.forEach(item => {
             if (!fundsMap.has(item.fund)) {
@@ -355,11 +404,11 @@
         
         let html = `
             <h3>📈 Общая статистика</h3>
-            <p>📊 Средняя доходность по всем фондам: <b class="${avgReturn >= 0 ? 'positive' : 'negative'}">${avgReturn}%</b></p>
+            <p>📊 Средняя арифметическая доходность по всем фондам: <b class="${avgReturn >= 0 ? 'positive' : 'negative'}">${avgReturn}%</b></p>
             <p>📈 Максимальная доходность: <b class="positive">${maxReturn}%</b></p>
             <p>📉 Минимальная доходность: <b class="negative">${minReturn}%</b></p>
             <p>🏦 Учтено записей: ${data.length}</p>
-            <h4>🏆 Топ-3 фонда по средней доходности:</h4>
+            <h4>🏆 Топ-3 фонда по средней арифметической доходности:</h4>
             <ol>
                 ${fundAverages.map(f => `<li>${f.fund}: <b class="positive">${f.avg.toFixed(2)}%</b></li>`).join('')}
             </ol>
