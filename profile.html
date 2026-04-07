@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>НПФ: профиль и доходность</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    .chart-container {
+      width: 90%;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .controls {
+      margin: 20px 0;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>НПФ «Примерный фонд»</h1>
+
+  <div class="controls">
+    <label> Год начала графика:
+      <input type="number" id="startYear" value="2015" min="2000" max="2026" />
+    </label>
+    <button onclick="updateCharts()">Перестроить графики</button>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="chartCumulative"></canvas>
+  </div>
+
+  <div class="chart-container">
+    <canvas id="chartAnnual"></canvas>
+  </div>
+
+  <script>
+    // ============= ТВОИ ДАННЫЕ ЗДЕСЬ =============
+    const data = {
+      years: [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+
+      // Доходность НПФ (годовые проценты)
+      npf: [4.2, 5.1, 3.8, 4.5, 5.3, 4.1, 6.2, 3.7, 5.8, 4.9, 4.2],
+
+      // Бенчмарки (массивы доходностей за те же годы)
+      benchmarks: [
+        { name: "Инфляция",  values: [12.9, 5.4, 2.5, 4.3, 4.5, 4.9, 6.7, 11.9, 5.9, 7.4, 5.6] },
+        { name: "ММВБ",      values: [13.4, 37.4, 18.6, 8.7, 18.3, 19.7, 27.9, -2.1, 8.1, 22.1, 12.1] },
+        { name: "ОФЗ",       values: [10.0, 12.5, 8.0, 10.2, 11.1, 13.3, 15.2, 9.5, 12.8, 10.1, 9.7] }
+      ]
+    };
+
+    // ============= ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =============
+
+    // Перевод годовых доходностей в накопленную стоимость (начало = 100)
+    function computeCumulative(yearly) {
+      let cumul = 100;
+      return yearly.map(perc => {
+        cumul = cumul * (1 + perc / 100);
+        return +(cumul.toFixed(2));
+      });
+    }
+
+    // Фильтрует данные по выбранному начальному году
+    function filterByYear(startYear) {
+      const idx = data.years.indexOf(startYear);
+      if (idx === -1) return null;
+
+      const years = data.years.slice(idx);
+      const npfCum = computeCumulative(data.npf.slice(idx));
+      const npfAnn = data.npf.slice(idx);
+
+      const benchCum = data.benchmarks.map(b => ({
+        name: b.name,
+        values: computeCumulative(b.values.slice(idx))
+      }));
+
+      const benchAnn = data.benchmarks.map(b => ({
+        name: b.name,
+        values: b.values.slice(idx)
+      }));
+
+      return { years, npfCum, npfAnn, benchCum, benchAnn };
+    }
+
+    // ============= ГРАФИК НАКОПЛЕННОЙ ДОХОДНОСТИ =============
+    let chartCumulative = null;
+
+    function drawCumulative(startYear) {
+      const filtered = filterByYear(startYear);
+      if (!filtered) return;
+
+      const { years, npfCum, benchCum } = filtered;
+
+      const datasets = [
+        {
+          label: "НПФ",
+          data: npfCum,
+          borderColor: "#0066ff",
+          backgroundColor: "rgba(0, 102, 255, 0.1)",
+          borderWidth: 2,
+          fill: false
+        }
+      ];
+
+      benchCum.forEach(b => {
+        datasets.push({
+          label: b.name,
+          data: b.values,
+          borderColor: getBenchmarkColor(b.name),
+          backgroundColor: getBenchmarkColor(b.name, 0.1),
+          borderWidth: 2,
+          fill: false
+        });
+      });
+
+      if (chartCumulative) chartCumulative.destroy();
+
+      const ctx = document.getElementById("chartCumulative").getContext("2d");
+      chartCumulative = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: years,
+          datasets
+        },
+        options: {
+          responsive: true,
+          plugins: { title: { display: true, text: "Накопленная доходность с " + startYear } },
+          scales: {
+            y: {
+              title: { display: true, text: "Накопленная стоимость (начало = 100)" }
+            }
+          }
+        }
+      });
+    }
+
+    // ============= ГРАФИК ГОДОВЫХ ДОХОДНОСТЕЙ =============
+    let chartAnnual = null;
+
+    function drawAnnual(startYear) {
+      const filtered = filterByYear(startYear);
+      if (!filtered) return;
+
+      const { years, npfAnn, benchAnn } = filtered;
+
+      const datasets = [
+        {
+          type: "bar",
+          label: "НПФ",
+          data: npfAnn,
+          backgroundColor: "rgba(0, 102, 255, 0.6)",
+          borderColor: "#0066ff",
+          borderWidth: 1
+        }
+      ];
+
+      benchAnn.forEach(b => {
+        datasets.push({
+          type: "bar",
+          label: b.name,
+          data: b.values,
+          backgroundColor: getBenchmarkColor(b.name, 0.4),
+          borderColor: getBenchmarkColor(b.name, 1.0),
+          borderWidth: 1
+        });
+      });
+
+      if (chartAnnual) chartAnnual.destroy();
+
+      const ctx = document.getElementById("chartAnnual").getContext("2d");
+      chartAnnual = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: years,
+          datasets
+        },
+        options: {
+          responsive: true,
+          plugins: { title: { display: true, text: "Годовая доходность с " + startYear } },
+          scales: {
+            y: {
+              title: { display: true, text: "Доходность, %" }
+            }
+          }
+        }
+      });
+    }
+
+    // ============= ВСПОМОГАТЕЛЬНЫЕ ЦВЕТА =============
+    function getBenchmarkColor(name, alpha = 1.0) {
+      const colors = {
+        "Инфляция": [255, 99, 132],
+        "ММВБ":      [75, 192, 192],
+        "ОФЗ":       [255, 206, 86]
+        // можешь добавить другие бенчмарки
+      };
+      const rgb = colors[name] || [153, 102, 255];
+      return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+    }
+
+    // ============= ИНИЦИАЛИЗАЦИЯ =============
+    function updateCharts() {
+      const startYear = parseInt(document.getElementById("startYear").value, 10);
+      drawCumulative(startYear);
+      drawAnnual(startYear);
+    }
+
+    // Первый рендер
+    updateCharts();
+  </script>
+
+</body>
+</html>
