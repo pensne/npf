@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Доходности НПФ - динамический расчет</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 40px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 8px;
+        }
+        select, input, button {
+            padding: 8px 12px;
+            margin: 0 5px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .missing {
+            color: #999;
+            font-style: italic;
+        }
+        .positive {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .negative {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .stats {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📊 Доходность НПФ</h1>
+    
+    <div class="controls">
+        <label>📅 Период:</label>
+        <input type="number" id="startYear" value="2018">
+        <span>—</span>
+        <input type="number" id="endYear" value="2024">
+        
+        <label>🏦 Фильтр по фонду:</label>
+        <select id="fundFilter">
+            <option value="">Все фонды</option>
+        </select>
+        
+        <button onclick="loadAndDisplay()">🔄 Показать доходность</button>
+    </div>
+    
+    <div id="result"></div>
+    <div id="stats" class="stats"></div>
+</div>
+
+<script>
+    // ВАША ССЫЛКА НА ОПУБЛИКОВАННЫЙ CSV
+    const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0xP6hNrFhTWCxec9251XFfrOolDs_HPFm2dMj1MSyLpPreXQQj3gBOWNsW8-6yL5ID0WxoSYGm6wJ/pub?output=csv';
+    
+    let allData = []; // Храним все данные [{fund, year, return}]
+    
+    async function loadAndDisplay() {
+        const startYear = parseInt(document.getElementById('startYear').value);
+        const endYear = parseInt(document.getElementById('endYear').value);
+        const selectedFund = document.getElementById('fundFilter').value;
+        
+        try {
+            // Загружаем данные если еще не загружены
+            if (allData.length === 0) {
+                await loadData();
+            }
+            
+            // Фильтруем по годам
+            let filteredData = allData.filter(d => d.year >= startYear && d.year <= endYear);
+            
+            // Фильтруем по фонду
+            if (selectedFund) {
+                filteredData = filteredData.filter(d => d.fund === selectedFund);
+            }
+            
+            displayResults(filteredData, startYear, endYear, selectedFund);
+            displayStats(filteredData);
+            
+        } catch(error) {
+            document.getElementById('result').innerHTML = 
+                `<div style="color:red; padding:20px;">❌ Ошибка загрузки: ${error.message}<br>
+                 Проверьте ссылку на Google Sheets и что таблица опубликована</div>`;
+        }
+    }
+    
+    async function loadData() {
+        const response = await fetch(SHEET_URL);
+        const csvText = await response.text();
+        
+        // Парсим CSV с учетом заголовков FundName, Year, Return
+        const lines = csvText.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        
+        // Находим индексы колонок (регистронезависимо)
+        const fundIndex = headers.findIndex(h => h.includes('fund') || h.includes('название'));
+        const yearIndex = headers.findIndex(h => h.includes('year') || h.includes('год'));
+        const returnIndex = headers.findIndex(h => h.includes('return') || h.includes('доходн') || h === 'return');
+        
+        if (fundIndex === -1 || yearIndex === -1 || returnIndex === -1) {
+            throw new Error('Не найдены нужные колонки. Ожидаются: FundName, Year, Return');
+        }
+        
+        allData = [];
+        
+        for(let i = 1; i < lines.length; i++) {
+            if(!lines[i].trim()) continue;
+            
+            // Обрабатываем кавычки в CSV
+            let values = [];
+            let inQuotes = false;
+            let current = '';
+            
+            for(let char of lines[i]) {
+                if(char === '"') {
+                    inQuotes = !inQuotes;
+                } else if(char === ',' && !inQuotes) {
+                    values.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            values.push(current.trim());
+            
+            const fund = values[fundIndex]?.replace(/^"|"$/g, '');
+            const year = parseInt(values[yearIndex]);
+            const ret = parseFloat(values[returnIndex]);
+            
+            if (fund && !isNaN(year) && !isNaN(ret)) {
+                allData.push({
+                    fund: fund,
+                    year: year,
+                    return: ret
+                });
+            }
+        }
+        
+        // Заполняем выпадающий список фондов
+        const funds = [...new Set(allData.map(d => d.fund))].sort();
+        const select = document.getElementById('fundFilter');
+        select.innerHTML = '<option value="">Все фонды</option>';
+        funds.forEach(fund => {
+            const option = document.createElement('option');
+            option.value = fund;
+            option.textContent = fund;
+            select.appendChild(option);
+        });
+        
+        console.log(`Загружено ${allData.length} записей по ${funds.length} фондам`);
+    }
+    
+    function displayResults(data, startYear, endYear, selectedFund) {
+        if (data.length === 0) {
+            document.getElementById('result').innerHTML = '<p>Нет данных за выбранный период</p>';
+            return;
+        }
+        
+        // Группируем по фондам
+        const fundsMap = new Map();
+        data.forEach(item => {
+            if (!fundsMap.has(item.fund)) {
+                fundsMap.set(item.fund, new Map());
+            }
+            fundsMap.get(item.fund).set(item.year, item.return);
+        });
+        
+        // Формируем таблицу
+        let html = '<table>\n<thead>\n<tr>\n<th>НПФ</th>\n';
+        
+        // Заголовки годов
+        for(let year = startYear; year <= endYear; year++) {
+            html += `<th>${year}</th>`;
+        }
+        html += '<th>Средняя<br>доходность</th>\n<th>Доступно<br>лет</th>\n</tr>\n</thead>\n<tbody>\n';
+        
+        // Сортируем фонды по алфавиту
+        const sortedFunds = Array.from(fundsMap.keys()).sort();
+        
+        sortedFunds.forEach(fund => {
+            const returnsByYear = fundsMap.get(fund);
+            html += '<tr>\n';
+            html += `<td><b>${fund}</b></td>\n`;
+            
+            let sum = 0;
+            let count = 0;
+            
+            for(let year = startYear; year <= endYear; year++) {
+                const ret = returnsByYear.get(year);
+                if (ret !== undefined) {
+                    const colorClass = ret >= 0 ? 'positive' : 'negative';
+                    html += `<td class="${colorClass}">${ret.toFixed(2)}%</td>\n`;
+                    sum += ret;
+                    count++;
+                } else {
+                    html += '<td class="missing">—</td>\n';
+                }
+            }
+            
+            const avg = count > 0 ? (sum / count).toFixed(2) : '—';
+            const avgClass = (avg !== '—' && parseFloat(avg) >= 0) ? 'positive' : 'negative';
+            html += `<td class="${avgClass}"><b>${avg}%</b></td>\n`;
+            html += `<td>${count}/${(endYear-startYear+1)}</td>\n`;
+            html += '</tr>\n';
+        });
+        
+        html += '</tbody>\n</table>';
+        document.getElementById('result').innerHTML = html;
+    }
+    
+    function displayStats(data) {
+        if (data.length === 0) return;
+        
+        const allReturns = data.map(d => d.return);
+        const avgReturn = (allReturns.reduce((a,b) => a+b, 0) / allReturns.length).toFixed(2);
+        const maxReturn = Math.max(...allReturns).toFixed(2);
+        const minReturn = Math.min(...allReturns).toFixed(2);
+        
+        // Топ-3 фонда по средней доходности
+        const fundsMap = new Map();
+        data.forEach(item => {
+            if (!fundsMap.has(item.fund)) {
+                fundsMap.set(item.fund, []);
+            }
+            fundsMap.get(item.fund).push(item.return);
+        });
+        
+        const fundAverages = Array.from(fundsMap.entries())
+            .map(([fund, returns]) => ({
+                fund: fund,
+                avg: returns.reduce((a,b) => a+b, 0) / returns.length
+            }))
+            .sort((a,b) => b.avg - a.avg)
+            .slice(0, 3);
+        
+        let html = `
+            <h3>📈 Общая статистика</h3>
+            <p>📊 Средняя доходность по всем фондам: <b class="${avgReturn >= 0 ? 'positive' : 'negative'}">${avgReturn}%</b></p>
+            <p>📈 Максимальная доходность: <b class="positive">${maxReturn}%</b></p>
+            <p>📉 Минимальная доходность: <b class="negative">${minReturn}%</b></p>
+            <p>🏦 Учтено записей: ${data.length}</p>
+            <h4>🏆 Топ-3 фонда по средней доходности:</h4>
+            <ol>
+                ${fundAverages.map(f => `<li>${f.fund}: <b class="positive">${f.avg.toFixed(2)}%</b></li>`).join('')}
+            </ol>
+        `;
+        
+        document.getElementById('stats').innerHTML = html;
+    }
+    
+    // Автоматическая загрузка при открытии страницы
+    loadAndDisplay();
+</script>
+</body>
+</html>
