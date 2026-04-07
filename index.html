@@ -228,8 +228,9 @@
         
         sortedFunds.forEach(fund => {
             const returnsByYear = fundsMap.get(fund);
-            html += '<tr>\n';
-            html += `<td><b>${fund}</b></td>\n`;
+            fund_html = "";
+            fund_html += '<tr>\n';
+            fund_html += `<td><b>${fund}</b></td>\n`;
             
             let sum = 0;
             let count = 0;
@@ -238,19 +239,21 @@
                 const ret = returnsByYear.get(year);
                 if (ret !== undefined) {
                     const colorClass = ret >= 0 ? 'positive' : 'negative';
-                    html += `<td class="${colorClass}">${ret.toFixed(2)}%</td>\n`;
+                    fund_html += `<td class="${colorClass}">${ret.toFixed(2)}%</td>\n`;
                     sum += ret;
                     count++;
                 } else {
-                    html += '<td class="missing">—</td>\n';
+                    return
                 }
             }
             
             const avg = count > 0 ? (sum / count).toFixed(2) : '—';
             const avgClass = (avg !== '—' && parseFloat(avg) >= 0) ? 'positive' : 'negative';
-            html += `<td class="${avgClass}"><b>${avg}%</b></td>\n`;
-            html += `<td>${count}/${(endYear-startYear+1)}</td>\n`;
-            html += '</tr>\n';
+            fund_html += `<td class="${avgClass}"><b>${avg}%</b></td>\n`;
+            fund_html += `<td>${count}/${(endYear-startYear+1)}</td>\n`;
+            fund_html += '</tr>\n';
+
+            html += fund_html
         });
         
         html += '</tbody>\n</table>';
