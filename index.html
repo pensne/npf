@@ -74,11 +74,62 @@
             background: #e9ecef;
             border-radius: 8px;
         }
+        
+        /* Стили для специальных фондов */
+        .special-fund-mcftr {
+            background-color: #fff3e0 !important;
+            border-left: 4px solid #ff9800 !important;
+        }
+        .special-fund-inflation {
+            background-color: #e8f5e9 !important;
+            border-left: 4px solid #4caf50 !important;
+        }
+        .special-fund-rgbitr {
+            background-color: #e3f2fd !important;
+            border-left: 4px solid #2196f3 !important;
+        }
+        
+        /* Легенда для специальных фондов */
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>📊 Доходность НПФ</h1>
+    
+    <!-- Легенда для специальных фондов -->
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #fff3e0; border-left: 4px solid #ff9800;"></div>
+            <span>MCFTR</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #e8f5e9; border-left: 4px solid #4caf50;"></div>
+            <span>Инфляция</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #e3f2fd; border-left: 4px solid #2196f3;"></div>
+            <span>RGBITR</span>
+        </div>
+    </div>
     
     <div class="controls">
         <label>📅 Период:</label>
@@ -103,6 +154,14 @@
     const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0xP6hNrFhTWCxec9251XFfrOolDs_HPFm2dMj1MSyLpPreXQQj3gBOWNsW8-6yL5ID0WxoSYGm6wJ/pub?gid=0&single=true&output=csv';
     
     let allData = []; // Храним все данные [{fund, year, return}]
+    
+    // Функция для определения класса специального фонда
+    function getSpecialFundClass(fundName) {
+        if (fundName === "MCFTR") return "special-fund-mcftr";
+        if (fundName === "Инфляция") return "special-fund-inflation";
+        if (fundName === "RGBITR") return "special-fund-rgbitr";
+        return "";
+    }
     
     async function loadAndDisplay() {
         const startYear = parseInt(document.getElementById('startYear').value);
@@ -228,12 +287,15 @@
         
         sortedFunds.forEach(fund => {
             const returnsByYear = fundsMap.get(fund);
-            fund_html = "";
-            fund_html += '<tr>\n';
+            const specialClass = getSpecialFundClass(fund);
+            const rowClass = specialClass ? `class="${specialClass}"` : '';
+            
+            let fund_html = `<tr ${rowClass}>\n`;
             fund_html += `<td><b>${fund}</b></td>\n`;
             
             let mul = 1.0;
             let count = 0;
+            let hasMissingData = false;
             
             for(let year = startYear; year <= endYear; year++) {
                 const ret = returnsByYear.get(year);
@@ -243,18 +305,23 @@
                     mul *= (1 + ret/100);
                     count++;
                 } else {
-                    return
+                    hasMissingData = true;
+                    break; // Прерываем цикл, так как в вашей логике используется return
                 }
             }
             
+            // Пропускаем фонд, если есть пропущенные данные (как в вашей исходной логике)
+            if (hasMissingData) {
+                return;
+            }
+            
             const avg = count > 0 ? (100*(Math.pow(mul, 1 / count)-1)).toFixed(2) : '—';
-            //alert("Mul " + mul + " count " + count);
             const avgClass = (avg !== '—' && parseFloat(avg) >= 0) ? 'positive' : 'negative';
             fund_html += `<td class="${avgClass}"><b>${avg}%</b></td>\n`;
             fund_html += `<td>${count}/${(endYear-startYear+1)}</td>\n`;
             fund_html += '</tr>\n';
-
-            html += fund_html
+            
+            html += fund_html;
         });
         
         html += '</tbody>\n</table>';
