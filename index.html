@@ -78,17 +78,22 @@
         
         /* Стили для специальных фондов */
         .special-fund-mcftr {
-            background-color: #fff3e0 !important;
+            background-color: #cadecc !important;
             border-left: 4px solid #ff9800 !important;
         }
         .special-fund-inflation {
-            background-color: #e8f5e9 !important;
+            background-color: #d1d1cf !important;
             border-left: 4px solid #4caf50 !important;
         }
         .special-fund-rgbitr {
-            background-color: #e3f2fd !important;
+            background-color: #96d2f2 !important;
             border-left: 4px solid #2196f3 !important;
         }
+
+        .special-fund-rucbtrns {
+            background-color: #e7dfe8 !important;
+            border-left: 4px solid #c8c8c8 !important;
+        }        
         
         /* Легенда для специальных фондов */
         .legend {
@@ -130,6 +135,12 @@
 <div class="container">
     <h1>📊 Доходность НПФ</h1>
     
+<div style="margin-bottom: 20px;">
+    <a href="rolling-periods.html" style="display: inline-block; padding: 8px 16px; background: #28a745; color: white; text-decoration: none; border-radius: 5px;">
+        📈 Анализ скользящих периодов (НПФ vs Инфляция)
+    </a>
+</div>
+
     <!-- Легенда для специальных фондов -->
     <div class="legend">
         <div class="legend-item">
@@ -176,6 +187,7 @@
         if (fundName === "MCFTR") return "special-fund-mcftr";
         if (fundName === "Инфляция") return "special-fund-inflation";
         if (fundName === "RGBITR") return "special-fund-rgbitr";
+        if (fundName === "RUCBTRNS") return "special-fund-rucbtrns";
         return "";
     }
     
@@ -199,7 +211,7 @@
             }
             
             displayResults(filteredData, startYear, endYear, selectedFund);
-            displayStats(filteredData);
+            displayStats(filteredData, startYear, endYear);
             
         } catch(error) {
             document.getElementById('result').innerHTML = 
@@ -376,50 +388,92 @@
         document.getElementById('result').innerHTML = html;
     }
     
-    function displayStats(data) {
-        if (data.length === 0) return;
+    function displayStats(data, startYear, endYear) {
+    if (data.length === 0) return;
+    
+    // Группируем по фондам и проверяем полноту данных
+    const fundsMapComplete = new Map();
+    data.forEach(item => {
+        if (!fundsMapComplete.has(item.fund)) {
+            fundsMapComplete.set(item.fund, new Map());
+        }
+        fundsMapComplete.get(item.fund).set(item.year, item.return);
+    });
+    
+    // Отбираем только фонды с полными данными за весь период
+    // Исключаем специальные бенчмарки
+    const yearsRange = endYear - startYear + 1;
+    const completeFundsData = [];
+    
+    for (const [fund, returnsByYear] of fundsMapComplete) {
+        // Пропускаем специальные бенчмарки
+        const specialClass = getSpecialFundClass(fund);
+        if (specialClass) {
+            console.log(`Исключаем бенчмарк из статистики: ${fund}`);
+            continue;
+        }
         
-        const allReturns = data.map(d => d.return);
-        const avgReturn = (allReturns.reduce((a,b) => a+b, 0) / allReturns.length).toFixed(2);
-        const maxReturn = Math.max(...allReturns).toFixed(2);
-        const minReturn = Math.min(...allReturns).toFixed(2);
+        let hasAllYears = true;
+        const returns = [];
         
-        // Топ-3 фонда по средней доходности (среднеарифметической)
-        const fundsMap = new Map();
-        data.forEach(item => {
-            if (!fundsMap.has(item.fund)) {
-                fundsMap.set(item.fund, []);
+        for (let year = startYear; year <= endYear; year++) {
+            const ret = returnsByYear.get(year);
+            if (ret === undefined) {
+                hasAllYears = false;
+                break;
             }
-            fundsMap.get(item.fund).push(item.return);
-        });
+            returns.push(ret);
+        }
         
-        //const avgReturn = (100*(allReturns.reduce((a,b) => a*b, 1.0) / allReturns.length) - 1).toFixed(2);
-
-        //alert(Array.from(fundsMap.entries()));
-        //alert(Math.pow(fundsMap.get("Профессиональный").reduce((a,b) => a*(b/100+1), 1.0), 1/fundsMap.get("Профессиональный").length));
-
-        const fundAverages = Array.from(fundsMap.entries())
-            .map(([fund, returns]) => ({
-                fund: fund,                
-                avg: 100*(Math.pow(returns.reduce((a,b) => a*(b/100+1), 1.0), 1 / returns.length) - 1)
-            }))
-            .sort((a,b) => b.avg - a.avg)
-            .slice(0, 3);
-        
-        let html = `
-            <h3>📈 Общая статистика</h3>
-            <p>📊 Средняя арифметическая доходность по всем фондам: <b class="${avgReturn >= 0 ? 'positive' : 'negative'}">${avgReturn}%</b></p>
-            <p>📈 Максимальная доходность: <b class="positive">${maxReturn}%</b></p>
-            <p>📉 Минимальная доходность: <b class="negative">${minReturn}%</b></p>
-            <p>🏦 Учтено записей: ${data.length}</p>
-            <h4>🏆 Топ-3 фонда по средней доходности:</h4>
-            <ol>
-                ${fundAverages.map(f => `<li>${f.fund}: <b class="positive">${f.avg.toFixed(2)}%</b></li>`).join('')}
-            </ol>
-        `;
-        
-        document.getElementById('stats').innerHTML = html;
+        if (hasAllYears && returns.length === yearsRange) {
+            completeFundsData.push({
+                fund: fund,
+                returns: returns
+            });
+        }
     }
+    
+    if (completeFundsData.length === 0) {
+        document.getElementById('stats').innerHTML = '<p>Нет фондов с полными данными за выбранный период</p>';
+        return;
+    }
+    
+    // Собираем все доходности для общей статистики
+    const allReturns = [];
+    completeFundsData.forEach(f => {
+        allReturns.push(...f.returns);
+    });
+    
+    const avgArithmeticReturn = (allReturns.reduce((a,b) => a+b, 0) / allReturns.length).toFixed(2);
+    const maxReturn = Math.max(...allReturns).toFixed(2);
+    const minReturn = Math.min(...allReturns).toFixed(2);
+    
+    // Топ-3 фонда по СРЕДНЕГЕОМЕТРИЧЕСКОЙ доходности (только фонды, без бенчмарков)
+    const fundAverages = completeFundsData.map(fund => {
+        const product = fund.returns.reduce((acc, ret) => acc * (1 + ret/100), 1.0);
+        const geometricAvg = 100 * (Math.pow(product, 1 / fund.returns.length) - 1);
+        return {
+            fund: fund.fund,
+            avg: geometricAvg
+        };
+    })
+    .sort((a,b) => b.avg - a.avg)
+    .slice(0, 3);
+    
+    let html = `
+        <h3>📈 Общая статистика (только фонды с полными данными за ${startYear}-${endYear})</h3>
+        <p>📊 Фондов с полными данными: ${completeFundsData.length}</p>
+        <p>📈 Средняя арифметическая доходность: <b class="${avgArithmeticReturn >= 0 ? 'positive' : 'negative'}">${avgArithmeticReturn}%</b></p>
+        <p>📈 Максимальная годовая доходность: <b class="positive">${maxReturn}%</b></p>
+        <p>📉 Минимальная годовая доходность: <b class="negative">${minReturn}%</b></p>
+        <h4>🏆 Топ-3 фонда по среднегеометрической доходности (CAGR):</h4>
+        <ol>
+            ${fundAverages.map(f => `<li>${f.fund}: <b class="${f.avg >= 0 ? 'positive' : 'negative'}">${f.avg.toFixed(2)}%</b></li>`).join('')}
+        </ol>
+    `;
+    
+    document.getElementById('stats').innerHTML = html;
+}
     
     // Автоматическая загрузка при открытии страницы
     loadAndDisplay();

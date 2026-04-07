@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Анализ скользящих периодов - НПФ vs Инфляция</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 40px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .back-link:hover {
+            background: #0056b3;
+        }
+        h1 {
+            color: #333;
+        }
+        .period-buttons {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 8px;
+        }
+        .period-btn {
+            padding: 10px 20px;
+            margin: 0 5px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .period-btn.active {
+            background: #007bff;
+        }
+        .period-btn:hover {
+            background: #5a6268;
+        }
+        .period-btn.active:hover {
+            background: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 13px;
+        }
+        th, td {
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .positive {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .negative {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .success-row {
+            background-color: #d4edda !important;
+        }
+        .fail-row {
+            background-color: #f8d7da !important;
+        }
+        .stats {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 8px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat-card h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        .big-number {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .loader {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #666;
+        }
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        .info-note {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
+        }
+        .fund-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .fund-item {
+            padding: 8px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .fund-item:hover {
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a href="index.html" class="back-link">← Назад к основной таблице</a>
+    
+    <h1>📊 Анализ скользящих периодов: НПФ vs Инфляция</h1>
+    
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #d4edda; border: 1px solid #28a745;"></div>
+            <span>Успех (средняя доходность фондов ≥ инфляции)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f8d7da; border: 1px solid #dc3545;"></div>
+            <span>Неудача (средняя доходность фондов &lt; инфляции)</span>
+        </div>
+    </div>
+    
+    <div class="period-buttons">
+        <strong>Длина периода:</strong>
+        <button class="period-btn" data-window="5">5 лет</button>
+        <button class="period-btn" data-window="7">7 лет</button>
+        <button class="period-btn" data-window="10">10 лет</button>
+        <button class="period-btn" data-window="15">15 лет</button>
+    </div>
+    
+    <div id="result">
+        <div class="loader">Загрузка данных...</div>
+    </div>
+    <div id="stats" class="stats"></div>
+    <div class="info-note">
+        * Анализируются только фонды с полными данными за все скользящие периоды выбранной длины.<br>
+        ** Доходность рассчитывается как среднегеометрическая (CAGR) за каждый период.<br>
+        *** Успех = средняя доходность всех фондов ≥ доходности инфляции за тот же период.
+    </div>
+</div>
+
+<script>
+    const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0xP6hNrFhTWCxec9251XFfrOolDs_HPFm2dMj1MSyLpPreXQQj3gBOWNsW8-6yL5ID0WxoSYGm6wJ/pub?gid=0&single=true&output=csv';
+    
+    let allData = [];
+    let currentWindow = 5;
+    let inflationData = new Map();
+    let fundData = new Map();
+    
+    function isBenchmark(fundName) {
+        const benchmarks = ["MCFTR", "Инфляция", "RGBITR", "RUCBTRNS"];
+        return benchmarks.includes(fundName);
+    }
+    
+    async function loadData() {
+        const response = await fetch(SHEET_URL);
+        const csvText = await response.text();
+        
+        const lines = csvText.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        
+        const fundIndex = headers.findIndex(h => h.includes('fund') || h.includes('название'));
+        const yearIndex = headers.findIndex(h => h.includes('year') || h.includes('год'));
+        const returnIndex = headers.findIndex(h => h.includes('return') || h.includes('доходн') || h === 'return');
+        
+        if (fundIndex === -1 || yearIndex === -1 || returnIndex === -1) {
+            throw new Error('Не найдены нужные колонки');
+        }
+        
+        const fundsTemp = new Map();
+        
+        for(let i = 1; i < lines.length; i++) {
+            if(!lines[i].trim()) continue;
+            
+            let values = [];
+            let inQuotes = false;
+            let current = '';
+            
+            for(let char of lines[i]) {
+                if(char === '"') {
+                    inQuotes = !inQuotes;
+                } else if(char === ',' && !inQuotes) {
+                    values.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            values.push(current.trim());
+            
+            const fund = values[fundIndex]?.replace(/^"|"$/g, '');
+            const year = parseInt(values[yearIndex]);
+            const ret = parseFloat(values[returnIndex]);
+            
+            if (fund && !isNaN(year) && !isNaN(ret)) {
+                if (!fundsTemp.has(fund)) {
+                    fundsTemp.set(fund, new Map());
+                }
+                fundsTemp.get(fund).set(year, ret);
+            }
+        }
+        
+        for (const [fund, returns] of fundsTemp) {
+            if (fund === "Инфляция") {
+                inflationData = returns;
+            } else if (!isBenchmark(fund)) {
+                fundData.set(fund, returns);
+            }
+        }
+        
+        console.log(`Загружено ${fundData.size} фондов, данные по инфляции за ${inflationData.size} лет`);
+    }
+    
+    function getRollingPeriods(windowYears) {
+        const allYears = Array.from(inflationData.keys()).sort();
+        if (allYears.length === 0) return [];
+        
+        const minYear = Math.min(...allYears);
+        const maxYear = Math.max(...allYears);
+        
+        const periods = [];
+        for (let start = minYear; start <= maxYear - windowYears + 1; start++) {
+            const end = start + windowYears - 1;
+            let hasAllYears = true;
+            for (let y = start; y <= end; y++) {
+                if (!inflationData.has(y)) {
+                    hasAllYears = false;
+                    break;
+                }
+            }
+            if (hasAllYears) {
+                periods.push({ start, end });
+            }
+        }
+        return periods;
+    }
+    
+    function calculateCAGR(returnsMap, startYear, endYear) {
+        let product = 1.0;
+        let count = 0;
+        
+        for (let year = startYear; year <= endYear; year++) {
+            const ret = returnsMap.get(year);
+            if (ret === undefined) return null;
+            product *= (1 + ret / 100);
+            count++;
+        }
+        
+        if (count === 0) return null;
+        return 100 * (Math.pow(product, 1 / count) - 1);
+    }
+    
+    function analyzePeriods(windowYears) {
+        const periods = getRollingPeriods(windowYears);
+        const periodResults = [];
+        
+        // Для каждого периода считаем среднюю доходность по всем фондам
+        for (const period of periods) {
+            let sumFundReturns = 0;
+            let fundCount = 0;
+            const fundReturnsList = [];
+            
+            for (const [fund, returns] of fundData) {
+                const fundCAGR = calculateCAGR(returns, period.start, period.end);
+                if (fundCAGR !== null) {
+                    sumFundReturns += fundCAGR;
+                    fundCount++;
+                    fundReturnsList.push({ fund, return: fundCAGR });
+                }
+            }
+            
+            const avgFundReturn = fundCount > 0 ? sumFundReturns / fundCount : null;
+            const inflationCAGR = calculateCAGR(inflationData, period.start, period.end);
+            
+            if (avgFundReturn !== null && inflationCAGR !== null) {
+                periodResults.push({
+                    period: `${period.start}-${period.end}`,
+                    start: period.start,
+                    end: period.end,
+                    avgFundReturn: avgFundReturn,
+                    inflationReturn: inflationCAGR,
+                    success: avgFundReturn >= inflationCAGR,
+                    fundReturnsList: fundReturnsList
+                });
+            }
+        }
+        
+        // Также собираем данные по каждому фонду для топ-листов
+        const fundStats = new Map();
+        
+        for (const period of periodResults) {
+            for (const fund of period.fundReturnsList) {
+                if (!fundStats.has(fund.fund)) {
+                    fundStats.set(fund.fund, { returns: [], successes: 0, total: 0 });
+                }
+                const stats = fundStats.get(fund.fund);
+                stats.returns.push(fund.return);
+                stats.total++;
+                if (fund.return >= period.inflationReturn) {
+                    stats.successes++;
+                }
+            }
+        }
+        
+        const fundSummary = [];
+        for (const [fund, stats] of fundStats) {
+            const avgReturn = stats.returns.reduce((a,b) => a+b, 0) / stats.returns.length;
+            const successRate = (stats.successes / stats.total) * 100;
+            fundSummary.push({
+                fund: fund,
+                avgReturn: avgReturn,
+                successRate: successRate,
+                successCount: stats.successes,
+                totalPeriods: stats.total
+            });
+        }
+        
+        fundSummary.sort((a, b) => b.successRate - a.successRate);
+        
+        return { periodResults, fundSummary, periodsCount: periods.length };
+    }
+    
+    function displayResults(windowYears) {
+        const analysis = analyzePeriods(windowYears);
+        const { periodResults, fundSummary, periodsCount } = analysis;
+        
+        if (periodResults.length === 0) {
+            document.getElementById('result').innerHTML = '<p>Нет данных для анализа</p>';
+            return;
+        }
+        
+        // Общая статистика по периодам
+        const totalSuccessPeriods = periodResults.filter(p => p.success).length;
+        const overallSuccessRate = (totalSuccessPeriods / periodResults.length) * 100;
+        
+        let totalAvgFundReturn = 0;
+        let totalInflationReturn = 0;
+        for (const period of periodResults) {
+            totalAvgFundReturn += period.avgFundReturn;
+            totalInflationReturn += period.inflationReturn;
+        }
+        const overallAvgFundReturn = totalAvgFundReturn / periodResults.length;
+        const overallAvgInflation = totalInflationReturn / periodResults.length;
+        
+        // Топ-3 и худшие 10 фондов
+        const top3Funds = fundSummary.slice(0, 3);
+        const bottom3Funds = fundSummary.slice(-3).reverse();
+        
+        // Таблица по периодам
+        let tableHtml = `
+            <h3>📋 Анализ ${windowYears}-летних периодов</h3>
+            <p><strong>Всего периодов: ${periodResults.length}</strong></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Период</th>
+                        <th>Средняя доходность фондов (CAGR)</th>
+                        <th>Инфляция (CAGR)</th>
+                        <th>Разница</th>
+                        <th>Результат</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        for (const period of periodResults) {
+            const rowClass = period.success ? 'success-row' : 'fail-row';
+            const diff = period.avgFundReturn - period.inflationReturn;
+            
+            tableHtml += `<tr class="${rowClass}">`;
+            tableHtml += `<td><b>${period.period}</b></td>`;
+            tableHtml += `<td class="${period.avgFundReturn >= 0 ? 'positive' : 'negative'}">${period.avgFundReturn.toFixed(2)}%</td>`;
+            tableHtml += `<td>${period.inflationReturn.toFixed(2)}%</td>`;
+            tableHtml += `<td class="${diff >= 0 ? 'positive' : 'negative'}">${diff >= 0 ? '+' : ''}${diff.toFixed(2)}%</td>`;
+            tableHtml += `<td>${period.success ? '✅ Успех' : '❌ Неудача'}</td>`;
+            tableHtml += `</tr>`;
+        }
+        
+        tableHtml += `
+                </tbody>
+            </table>
+        `;
+        
+        // Статистика
+        const statsHtml = `
+            <h3>📊 Общая статистика за ${windowYears}-летние периоды</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>📈 Успешность системы</h3>
+                    <div class="big-number ${overallSuccessRate >= 50 ? 'positive' : 'negative'}">
+                        ${overallSuccessRate.toFixed(1)}%
+                    </div>
+                    <p>Успешных периодов: ${totalSuccessPeriods} из ${periodResults.length}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>💰 Средняя доходность</h3>
+                    <p>Фонды (средняя): <b class="${overallAvgFundReturn >= 0 ? 'positive' : 'negative'}">${overallAvgFundReturn.toFixed(2)}%</b></p>
+                    <p>Инфляция: <b class="${overallAvgInflation >= 0 ? 'positive' : 'negative'}">${overallAvgInflation.toFixed(2)}%</b></p>
+                    <p>Разница: <b class="${(overallAvgFundReturn - overallAvgInflation) >= 0 ? 'positive' : 'negative'}">
+                        ${(overallAvgFundReturn - overallAvgInflation).toFixed(2)}%</b>
+                    </p>
+                </div>
+                <div class="stat-card">
+                    <h3>🏆 Топ-10 фондов по успешности</h3>
+                    <ol style="margin: 0; padding-left: 20px;">
+                        ${top3Funds.map(f => `<li><b>${f.fund}</b><br>
+                            Успешность: <span class="positive">${f.successRate.toFixed(1)}%</span> (${f.successCount}/${f.totalPeriods})<br>
+                            Средняя доходность: <span class="${f.avgReturn >= 0 ? 'positive' : 'negative'}">${f.avgReturn.toFixed(2)}%</span>
+                        </li>`).join('')}
+                    </ol>
+                </div>
+                <div class="stat-card">
+                    <h3>⚠️ Худшие 10 фондов по успешности</h3>
+                    <ol style="margin: 0; padding-left: 20px;">
+                        ${bottom3Funds.map(f => `<li><b>${f.fund}</b><br>
+                            Успешность: <span class="${f.successRate >= 50 ? 'positive' : 'negative'}">${f.successRate.toFixed(1)}%</span> (${f.successCount}/${f.totalPeriods})<br>
+                            Средняя доходность: <span class="${f.avgReturn >= 0 ? 'positive' : 'negative'}">${f.avgReturn.toFixed(2)}%</span>
+                        </li>`).join('')}
+                    </ol>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('result').innerHTML = tableHtml;
+        document.getElementById('stats').innerHTML = statsHtml;
+    }
+    
+    async function init() {
+        try {
+            await loadData();
+            displayResults(currentWindow);
+            
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentWindow = parseInt(btn.dataset.window);
+                    displayResults(currentWindow);
+                });
+            });
+            
+        } catch(error) {
+            document.getElementById('result').innerHTML = 
+                `<div style="color:red; padding:20px;">❌ Ошибка загрузки: ${error.message}</div>`;
+        }
+    }
+    
+    init();
+</script>
+</body>
+</html>
