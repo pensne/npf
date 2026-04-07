@@ -42,6 +42,7 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            font-size: 11px;
         }
         th, td {
             border: 1px solid #dee2e6;
@@ -147,7 +148,7 @@
     
     <div class="controls">
         <label>📅 Период:</label>
-        <input type="number" id="startYear" value="2018">
+        <input type="number" id="startYear" value="2010">
         <span>—</span>
         <input type="number" id="endYear" value="2024">
         
@@ -336,9 +337,8 @@
         for(let year = startYear; year <= endYear; year++) {
             html += `<th>${year}</th>`;
         }
-        html += '<th>Среднегеометрическая<br>доходность</th>\n';
-        html += '<th>Совокупная<br>доходность</th>\n';
-        html += '<th>Доступно<br>лет</th>\n';
+        html += '<th>Средняя</th>\n';
+        html += '<th>Совокупная</th>\n';
         html += '</tr>\n</thead>\n<tbody>\n';
         
         // Выводим отсортированные фонды
@@ -367,7 +367,6 @@
             fund_html += `<td class="${totalClass}"><b>${fund.totalReturn.toFixed(2)}%</b></td>\n`;
             
             // Количество лет
-            fund_html += `<td>${fund.count}/${(endYear-startYear+1)}</td>\n`;
             fund_html += '</tr>\n';
             
             html += fund_html;
@@ -394,10 +393,15 @@
             fundsMap.get(item.fund).push(item.return);
         });
         
+        //const avgReturn = (100*(allReturns.reduce((a,b) => a*b, 1.0) / allReturns.length) - 1).toFixed(2);
+
+        //alert(Array.from(fundsMap.entries()));
+        //alert(Math.pow(fundsMap.get("Профессиональный").reduce((a,b) => a*(b/100+1), 1.0), 1/fundsMap.get("Профессиональный").length));
+
         const fundAverages = Array.from(fundsMap.entries())
             .map(([fund, returns]) => ({
-                fund: fund,
-                avg: returns.reduce((a,b) => a+b, 0) / returns.length
+                fund: fund,                
+                avg: 100*(Math.pow(returns.reduce((a,b) => a*(b/100+1), 1.0), 1 / returns.length) - 1)
             }))
             .sort((a,b) => b.avg - a.avg)
             .slice(0, 3);
@@ -408,7 +412,7 @@
             <p>📈 Максимальная доходность: <b class="positive">${maxReturn}%</b></p>
             <p>📉 Минимальная доходность: <b class="negative">${minReturn}%</b></p>
             <p>🏦 Учтено записей: ${data.length}</p>
-            <h4>🏆 Топ-3 фонда по средней арифметической доходности:</h4>
+            <h4>🏆 Топ-3 фонда по средней доходности:</h4>
             <ol>
                 ${fundAverages.map(f => `<li>${f.fund}: <b class="positive">${f.avg.toFixed(2)}%</b></li>`).join('')}
             </ol>
