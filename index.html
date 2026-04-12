@@ -126,6 +126,10 @@
         .special-fund-rucbtrns {
             background-color: #e7dfe8 !important;
             border-left: 4px solid #c8c8c8 !important;
+        }
+        .special-fund-6040 {
+            background-color: #f3d6b1 !important;
+            border-left: 4px solid #c8c8c8 !important;
         }        
         
         /* Легенда для специальных фондов */
@@ -178,7 +182,7 @@
     </div>
     
     <!-- Легенда для специальных фондов -->
-    <div class="legend">
+    <!-- <div class="legend">
         <div class="legend-item">
             <div class="legend-color" style="background: #cadecc; border-left: 4px solid #ff9800;"></div>
             <span>MCFTR</span>
@@ -195,7 +199,7 @@
             <div class="legend-color" style="background: #e7dfe8; border-left: 4px solid #c8c8c8;"></div>
             <span>RUCBTRNS</span>
         </div>
-    </div>
+    </div> -->
     
     <div class="controls">
         <label>📅 Период:</label>
@@ -232,6 +236,7 @@
         if (fundName === "Инфляция") return "special-fund-inflation";
         if (fundName === "RGBITR") return "special-fund-rgbitr";
         if (fundName === "RUCBTRNS") return "special-fund-rucbtrns";
+        if (fundName === "Акции/Облигации 60/40") return "special-fund-6040";
         return "";
     }
     
