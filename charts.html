@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+        (function(m,e,t,r,i,k,a){
+            m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+            m[i].l=1*new Date();
+            for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+            k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+        })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=108439905', 'ym');
+
+        ym(108439905, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+    </script>
+    <noscript><div><img src="https://mc.yandex.ru/watch/108439905" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+    <!-- /Yandex.Metrika counter -->
+
+    <title>Графики доходности НПФ/УК</title>
+    <meta charset="UTF-8">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 40px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .back-link:hover {
+            background: #0056b3;
+        }
+        .data-source {
+            margin: 15px 0;
+            padding: 10px;
+            background: #fff3cd;
+            border-radius: 8px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        .data-source label {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        .data-source input {
+            margin: 0;
+            cursor: pointer;
+        }
+        .controls {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 8px;
+        }
+        .year-controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .year-controls input {
+            padding: 8px;
+            width: 100px;
+        }
+        .fund-selector {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .fund-selector select {
+            width: 300px;
+            padding: 8px;
+        }
+        .selected-funds {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .fund-tag {
+            background: #007bff;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .fund-tag button {
+            background: rgba(255,255,255,0.3);
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 12px;
+            padding: 0;
+        }
+        .fund-tag button:hover {
+            background: rgba(255,255,255,0.5);
+        }
+        button {
+            padding: 8px 16px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1e7e34;
+        }
+        .chart-container {
+            margin-top: 30px;
+            position: relative;
+            height: 500px;
+        }
+        .benchmark-checkboxes {
+            margin: 15px 0;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 8px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .benchmark-checkboxes label {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        .info-note {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
+        }
+        .loader {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <a href="index.html" class="back-link">← Назад к таблице</a>
+    <a href="rolling-periods.html" class="back-link" style="background: #28a745; margin-left: 10px;">📈 Анализ периодов</a>
+    
+    <h1>📈 Графики доходности</h1>
+    
+    <div class="data-source">
+        <strong>Выберите тип:</strong>
+        <label>
+            <input type="radio" name="dataSource" value="npf" checked> НПФ
+        </label>
+        <label>
+            <input type="radio" name="dataSource" value="uk"> УК (Управляющие компании)
+        </label>
+    </div>
+    
+    <div class="controls">
+        <div class="year-controls">
+            <label>📅 Начальный год (доходность за этот год):</label>
+            <input type="number" id="startYear" value="2010">
+            <label>Конечный год (доходность за этот год):</label>
+            <input type="number" id="endYear" value="2024">
+            <button onclick="updateChart()">Обновить график</button>
+        </div>
+    </div>
+    
+    <div class="benchmark-checkboxes">
+        <strong>Бенчмарки (всегда на графике):</strong>
+        <label><input type="checkbox" id="benchMCFTR" checked> <span class="legend-color" style="background: #ff9800;"></span> MCFTR</label>
+        <label><input type="checkbox" id="benchInflation" checked> <span class="legend-color" style="background: #6c757d;"></span> Инфляция</label>
+        <label><input type="checkbox" id="benchRGBITR" checked> <span class="legend-color" style="background: #2196f3;"></span> RGBITR</label>
+        <label><input type="checkbox" id="benchRUCBTRNS" checked> <span class="legend-color" style="background: #9c27b0;"></span> RUCBTRNS</label>
+        <label><input type="checkbox" id="bench6040" checked> <span class="legend-color" style="background: #ff5722;"></span> Акции/Облигации 60/40</label>
+        <label><input type="checkbox" id="benchMedian" checked> <span class="legend-color" style="background: #000000;"></span> Медианный фонд</label>
+    </div>
+    
+    <div class="fund-selector">
+        <strong>➕ Добавить фонд на график:</strong>
+        <select id="fundSelect">
+            <option value="">-- Выберите фонд --</option>
+        </select>
+        <button onclick="addFund()">Добавить</button>
+        
+        <div id="selectedFunds" class="selected-funds"></div>
+    </div>
+    
+    <div class="chart-container">
+        <canvas id="returnsChart"></canvas>
+    </div>
+    
+    <div class="info-note">
+        * График показывает накопленный рост капитала (индексированный к 100 на начало начального года).<br>
+        ** <strong>Пример:</strong> выбор 2010-2011 даст точки: 2010 (100), 2011 (после доходности за 2010), 2012 (после доходности за 2011).<br>
+        *** Медианный фонд = медианная доходность всех фондов (без бенчмарков) за каждый год.<br>
+        **** Для корректного отображения у фонда должны быть данные за все выбранные годы.
+    </div>
+</div>
+
+<script>
+    const DATA_URLS = {
+        npf: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0xP6hNrFhTWCxec9251XFfrOolDs_HPFm2dMj1MSyLpPreXQQj3gBOWNsW8-6yL5ID0WxoSYGm6wJ/pub?output=csv&gid=0',
+        uk:  'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0xP6hNrFhTWCxec9251XFfrOolDs_HPFm2dMj1MSyLpPreXQQj3gBOWNsW8-6yL5ID0WxoSYGm6wJ/pub?output=csv&gid=724842481'
+    };
+    
+    let allData = [];
+    let currentDataSource = 'npf';
+    let chart = null;
+    let selectedFunds = [];
+    
+    function isBenchmark(fundName) {
+        const benchmarks = ["MCFTR", "Инфляция", "RGBITR", "RUCBTRNS", "Акции/Облигации 60/40"];
+        return benchmarks.includes(fundName);
+    }
+    
+    async function loadData() {
+        const radioSelected = document.querySelector('input[name="dataSource"]:checked').value;
+        currentDataSource = radioSelected;
+        const SHEET_URL = DATA_URLS[currentDataSource];
+        
+        const response = await fetch(SHEET_URL);
+        const csvText = await response.text();
+        
+        const lines = csvText.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        
+        const fundIndex = headers.findIndex(h => h.includes('fund') || h.includes('название'));
+        const yearIndex = headers.findIndex(h => h.includes('year') || h.includes('год'));
+        const returnIndex = headers.findIndex(h => h.includes('return') || h.includes('доходн') || h === 'return');
+        
+        if (fundIndex === -1 || yearIndex === -1 || returnIndex === -1) {
+            throw new Error('Не найдены нужные колонки');
+        }
+        
+        const fundsTemp = new Map();
+        
+        for(let i = 1; i < lines.length; i++) {
+            if(!lines[i].trim()) continue;
+            
+            let values = [];
+            let inQuotes = false;
+            let current = '';
+            
+            for(let char of lines[i]) {
+                if(char === '"') {
+                    inQuotes = !inQuotes;
+                } else if(char === ',' && !inQuotes) {
+                    values.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            values.push(current.trim());
+            
+            const fund = values[fundIndex]?.replace(/^"|"$/g, '');
+            const year = parseInt(values[yearIndex]);
+            const ret = parseFloat(values[returnIndex]);
+            
+            if (fund && !isNaN(year) && !isNaN(ret)) {
+                if (!fundsTemp.has(fund)) {
+                    fundsTemp.set(fund, new Map());
+                }
+                fundsTemp.get(fund).set(year, ret);
+            }
+        }
+        
+        allData = fundsTemp;
+        
+        const fundsList = Array.from(fundsTemp.keys())
+            .filter(f => !isBenchmark(f))
+            .sort();
+        
+        const select = document.getElementById('fundSelect');
+        select.innerHTML = '<option value="">-- Выберите фонд --</option>';
+        fundsList.forEach(fund => {
+            const option = document.createElement('option');
+            option.value = fund;
+            option.textContent = fund;
+            select.appendChild(option);
+        });
+        
+        console.log(`Загружено ${fundsTemp.size} объектов (${currentDataSource})`);
+    }
+    
+    function calculateMedian(arr) {
+        if (arr.length === 0) return null;
+        const sorted = [...arr].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 === 0) {
+            return (sorted[mid - 1] + sorted[mid]) / 2;
+        }
+        return sorted[mid];
+    }
+    
+    // Исправленная функция: 
+    // startYear, endYear - годы, за которые берем доходность
+    // Точки на графике: startYear (100), startYear+1 (после доходности за startYear), ..., endYear+1 (после доходности за endYear)
+    function calculateGrowthCurve(returnsMap, startYear, endYear) {
+        const years = [];
+        const values = [];
+        let current = 100;
+        
+        // Точка в начале startYear
+        years.push(startYear);
+        values.push(100);
+        
+        // Применяем доходность за каждый год, получаем точку на следующий год
+        for (let year = startYear; year <= endYear; year++) {
+            const ret = returnsMap.get(year);
+            if (ret === undefined) return null;
+            current = current * (1 + ret / 100);
+            years.push(year + 1);
+            values.push(current);
+        }
+        
+        return { years, values };
+    }
+    
+    function calculateMedianFundCurve(startYear, endYear) {
+        // Собираем доходности всех фондов (не бенчмарков) по годам
+        const yearlyReturns = new Map();
+        
+        for (const [fund, returnsMap] of allData) {
+            if (isBenchmark(fund)) continue;
+            
+            for (let year = startYear; year <= endYear; year++) {
+                const ret = returnsMap.get(year);
+                if (ret !== undefined) {
+                    if (!yearlyReturns.has(year)) {
+                        yearlyReturns.set(year, []);
+                    }
+                    yearlyReturns.get(year).push(ret);
+                }
+            }
+        }
+        
+        // Проверяем, что для всех годов есть данные
+        for (let year = startYear; year <= endYear; year++) {
+            if (!yearlyReturns.has(year) || yearlyReturns.get(year).length === 0) {
+                return null;
+            }
+        }
+        
+        // Вычисляем медианную доходность за каждый год
+        const medianReturns = [];
+        for (let year = startYear; year <= endYear; year++) {
+            const returns = yearlyReturns.get(year);
+            const median = calculateMedian(returns);
+            medianReturns.push(median);
+        }
+        
+        // Строим кривую роста
+        const years = [startYear];
+        const values = [100];
+        let current = 100;
+        
+        for (let i = 0; i < medianReturns.length; i++) {
+            current = current * (1 + medianReturns[i] / 100);
+            years.push(startYear + i + 1);
+            values.push(current);
+        }
+        
+        return { years, values };
+    }
+    
+    async function updateChart() {
+        const startYear = parseInt(document.getElementById('startYear').value);
+        const endYear = parseInt(document.getElementById('endYear').value);
+        
+        if (startYear > endYear) {
+            alert('Начальный год не может быть больше конечного');
+            return;
+        }
+        
+        const datasets = [];
+        const colors = [
+            '#e91e63', '#00bcd4', '#8bc34a', '#795548', '#607d8b', '#3f51b5',
+            '#ff6e40', '#1e88e5', '#d81b60', '#43a047'
+        ];
+        let colorIndex = 0;
+        
+        // Бенчмарки
+        const benchmarks = [
+            { id: 'benchMCFTR', name: 'MCFTR', color: '#ff9800' },
+            { id: 'benchInflation', name: 'Инфляция', color: '#6c757d' },
+            { id: 'benchRGBITR', name: 'RGBITR', color: '#2196f3' },
+            { id: 'benchRUCBTRNS', name: 'RUCBTRNS', color: '#9c27b0' },
+            { id: 'bench6040', name: 'Акции/Облигации 60/40', color: '#ff5722' }
+        ];
+        
+        for (const bench of benchmarks) {
+            const checkbox = document.getElementById(bench.id);
+            if (checkbox && checkbox.checked) {
+                const fundData = allData.get(bench.name);
+                if (fundData) {
+                    const curve = calculateGrowthCurve(fundData, startYear, endYear);
+                    if (curve) {
+                        datasets.push({
+                            label: bench.name,
+                            data: curve.values,
+                            borderColor: bench.color,
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            tension: 0.1,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        });
+                    }
+                }
+            }
+        }
+        
+        // Медианный фонд
+        const medianCheckbox = document.getElementById('benchMedian');
+        if (medianCheckbox && medianCheckbox.checked) {
+            const medianCurve = calculateMedianFundCurve(startYear, endYear);
+            if (medianCurve) {
+                datasets.push({
+                    label: 'Медианный фонд',
+                    data: medianCurve.values,
+                    borderColor: '#000000',
+                    backgroundColor: 'transparent',
+                    borderWidth: 3,
+                    borderDash: [5, 5],
+                    tension: 0.1,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                });
+            }
+        }
+        
+        // Выбранные фонды
+        for (const fundName of selectedFunds) {
+            const fundData = allData.get(fundName);
+            if (fundData) {
+                const curve = calculateGrowthCurve(fundData, startYear, endYear);
+                if (curve) {
+                    datasets.push({
+                        label: fundName,
+                        data: curve.values,
+                        borderColor: colors[colorIndex % colors.length],
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    });
+                    colorIndex++;
+                }
+            }
+        }
+        
+        if (datasets.length === 0) {
+            const ctx = document.getElementById('returnsChart').getContext('2d');
+            if (chart) chart.destroy();
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            ctx.font = '16px Arial';
+            ctx.fillStyle = '#999';
+            ctx.fillText('Нет данных для отображения', 50, 100);
+            return;
+        }
+        
+        // Получаем все уникальные годы из первого датасета
+        let allYears = [];
+        if (datasets.length > 0 && datasets[0].data) {
+            // Годы определяем по первому датасету, но лучше собрать все
+            const firstCurve = calculateGrowthCurve(allData.get('MCFTR'), startYear, endYear);
+            if (firstCurve) {
+                allYears = firstCurve.years;
+            }
+        }
+        
+        if (chart) {
+            chart.destroy();
+        }
+        
+        const ctx = document.getElementById('returnsChart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: allYears,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.dataset.label}: ${context.raw.toFixed(1)} (индекс, начало = 100)`;
+                            }
+                        }
+                    },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 10 },
+                            boxWidth: 12
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Накопленный рост (начало = 100)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value.toFixed(0);
+                            }
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Год'
+                        },
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function addFund() {
+        const select = document.getElementById('fundSelect');
+        const fundName = select.value;
+        if (!fundName) return;
+        
+        if (selectedFunds.includes(fundName)) {
+            alert('Этот фонд уже добавлен');
+            return;
+        }
+        
+        selectedFunds.push(fundName);
+        renderSelectedFunds();
+        updateChart();
+        
+        select.value = '';
+    }
+    
+    function removeFund(fundName) {
+        selectedFunds = selectedFunds.filter(f => f !== fundName);
+        renderSelectedFunds();
+        updateChart();
+    }
+    
+    function renderSelectedFunds() {
+        const container = document.getElementById('selectedFunds');
+        container.innerHTML = '';
+        
+        for (const fund of selectedFunds) {
+            const tag = document.createElement('div');
+            tag.className = 'fund-tag';
+            tag.innerHTML = `
+                ${fund}
+                <button onclick="removeFund('${fund.replace(/'/g, "\\'")}')">✕</button>
+            `;
+            container.appendChild(tag);
+        }
+    }
+    
+    async function refresh() {
+        try {
+            await loadData();
+            selectedFunds = [];
+            renderSelectedFunds();
+            await updateChart();
+        } catch(error) {
+            console.error('Ошибка:', error);
+            const container = document.querySelector('.chart-container');
+            const errorMsg = document.createElement('div');
+            errorMsg.style.color = 'red';
+            errorMsg.style.padding = '20px';
+            errorMsg.innerHTML = `❌ Ошибка загрузки: ${error.message}`;
+            container.appendChild(errorMsg);
+        }
+    }
+    
+    // Подписка на изменение переключателя
+    document.querySelectorAll('input[name="dataSource"]').forEach(radio => {
+        radio.addEventListener('change', async () => {
+            await refresh();
+        });
+    });
+    
+    // Загружаем данные при старте
+    refresh();
+</script>
+</body>
+</html>
