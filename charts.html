@@ -230,6 +230,16 @@
     </div>
 </div>
 
+<div style="margin-top: 20px; text-align: center; padding-top: 20px; border-top: 1px solid #dee2e6;">
+    <a href="https://t.me/pince_nez" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: #0088cc; font-size: 14px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.6-1.38-.97-2.23-1.56-.99-.69-.35-1.07.22-1.69.15-.15 2.71-2.48 2.76-2.69.01-.03.02-.14-.05-.2-.07-.06-.18-.04-.26-.02-.11.02-1.86 1.18-5.26 3.48-.5.34-.95.51-1.36.5-.45-.01-1.31-.25-1.95-.46-.79-.26-1.42-.4-1.36-.85.03-.24.36-.49.99-.74 3.91-1.7 6.52-2.82 7.83-3.37 3.73-1.55 4.51-1.82 5.01-1.83.11 0 .36.03.52.18.14.13.17.31.19.49-.02.17 0 .55-.11 1.14z"/>
+        </svg>
+        Связь: Telegram канал pince_nez
+    </a>
+</div>
+
+
 <script>
     const DATA_URLS = {
         npf: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0xP6hNrFhTWCxec9251XFfrOolDs_HPFm2dMj1MSyLpPreXQQj3gBOWNsW8-6yL5ID0WxoSYGm6wJ/pub?output=csv&gid=0',
@@ -621,6 +631,13 @@
             await refresh();
         });
     });
+
+    // Автоматическое обновление при изменении годов
+    const startYearInput = document.getElementById('startYear');
+    const endYearInput = document.getElementById('endYear');
+
+    startYearInput.addEventListener('change', () => updateChart());
+    endYearInput.addEventListener('change', () => updateChart());
     
     // Загружаем данные при старте
     refresh();
