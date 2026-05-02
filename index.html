@@ -435,15 +435,15 @@
                 const ret = fund.returnsByYear.get(year);
                 if (ret !== undefined) {
                     const colorClass = ret >= 0 ? 'positive' : 'negative';
-                    fund_html += `<td class="${colorClass}">${ret.toFixed(2)}%</td>\n`;
+                    fund_html += `<td class="${colorClass}">${ret.toFixed(1)}%</td>\n`;
                 }
             }
             
             const avgClass = fund.geometricAvg >= 0 ? 'positive' : 'negative';
-            fund_html += `<td class="${avgClass}"><b>${fund.geometricAvg.toFixed(2)}%</b></td>\n`;
+            fund_html += `<td class="${avgClass}"><b>${fund.geometricAvg.toFixed(1)}%</b></td>\n`;
             
             const totalClass = fund.totalReturn >= 0 ? 'positive' : 'negative';
-            fund_html += `<td class="${totalClass}"><b>${fund.totalReturn.toFixed(2)}%</b></td>\n`;
+            fund_html += `<td class="${totalClass}"><b>${fund.totalReturn.toFixed(1)}%</b></td>\n`;
             
             fund_html += '</tr>\n';
             html += fund_html;
